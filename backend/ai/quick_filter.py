@@ -15,6 +15,15 @@ Given the paper title and abstract, and the researcher's profile, classify if th
 IMPORTANT: Be generous — classify as relevant if there is ANY chance the paper relates to the researcher's work.
 Only mark as not-relevant if the paper is clearly in a completely different field.
 
+RELEVANCE PATHS: The researcher's direction typically has BOTH methodological foundations
+(e.g. reinforcement learning, game theory, POMDP) AND application domains (e.g. perception,
+sensing, monitoring, human-machine interaction). A paper qualifies as relevant if it advances
+EITHER path — a sensing/perception paper IS relevant to someone whose direction includes
+"intelligent perception", even if the paper doesn't mention decision-making algorithms.
+Similarly, a MARL/game theory paper IS relevant even if it doesn't mention the application domain.
+Do NOT reject a paper just because it uses unfamiliar hardware terms (e.g. metamaterial, RF,
+mmWave) — look at what PROBLEM it solves, not what TECHNOLOGY it uses.
+
 Respond with valid JSON: {{"is_relevant": bool, "relevance_reason": "one sentence"}}"""
 
 QUICK_TEMPLATE = """Research Direction: {research_direction}
