@@ -1788,16 +1788,66 @@ def _update_profile_from_feedback(paper_id: str, rating: str):
         try:
             from backend.ai.llm import build_chat, task_model
             llm = build_chat(task_model("topic"), thinking=False, temperature=0.2)
-            resp = llm.invoke(
-                f"Extract 5-7 short topic phrases (2-5 words each) from this paper's method and motivation. "
-                f"用简体中文输出主题（标准技术术语保留英文），与用户画像语言一致。"
-                f"Return ONLY a JSON array of strings, no explanation.\n\n"
-                f"Method: {method[:500]}\nMotivation: {motivation[:300]}{score_hint}{note_hint}"
-            )
+            resp =             llm = build_chat(task_model("topic"), thinking=False, temperature=0.2)
+
+            # dislike 与 like 采用不同提取策略：
+            # - like: 提取论文的全部核心主题（用户想多看）
+            # - dislike: 只提取用户明确排斥的"具体方向"，不拉入仍可能关心的大领域
+            liked_list = profile.get("liked_topics", []) if note else []
+            liked_str = "; ".join(liked_list[-30:]) if liked_list else "(none)"
+
+            if rating == "dislike":
+                extract_prompt = (
+                    f"The user REJECTED this paper. Extract ONLY 3-5 specific topic phrases "
+                    f"representing what the user wants to AVOID.\n"
+                    f"CRITICAL RULES:\n"
+                    f"- Focus on the SPECIFIC approach/technique/domain being rejected\n"
+                    f"- Do NOT include broader research areas that may overlap with the user's interests\n"
+                    f"- If the user left a comment, extract topics they explicitly criticize or distance from\n"
+                    f"- Cross-check against liked topics below — EXCLUDE anything similar\n"
+                    f"\nUser's LIKED topics (do NOT contradict these):\n{liked_str}\n"
+                    f"\n用简体中文输出（标准技术术语保留英文）。"
+                    f"Return ONLY a JSON array of 3-5 strings.\n\n"
+                    f"Method: {method[:500]}\nMotivation: {motivation[:300]}{score_hint}{note_hint}"
+                )
+            else:
+                extract_prompt = (
+                    f"The user LIKED this paper. Extract 5-7 core topic phrases "
+                    f"representing what the user wants MORE of.\n"
+                    f"用简体中文输出（标准技术术语保留英文）。"
+                    f"Return ONLY a JSON array of strings, no explanation.\n\n"
+                    f"Method: {method[:500]}\nMotivation: {motivation[:300]}{score_hint}{note_hint}"
+                )
+            resp = llm.invoke(extract_prompt)
             topics = json.loads(resp.content)
             if not isinstance(topics, list):
                 return
             topics = [t.strip() for t in topics if isinstance(t, str) and t.strip()][:7]
+
+            # 交叉防线：dislike 的主题不得与已有 liked 主题冲突
+            # （简单词级重叠检测：任一 liked 主题的 ≥2 个实词出现在 dislike 主题中则剔除）
+            if rating == "dislike":
+                try:
+                    _prof = json.loads(Path(_PROFILE_PATH).read_text(encoding="utf-8"))
+                    _liked = _prof.get("liked_topics", [])
+                except Exception:
+                    _liked = []
+                if _liked:
+                    def _tokens(t):
+                        return {w for w in re.split(r"[^a-z\u4e00-\u9fff]+", t.lower()) if len(w) >= 2}
+                    _liked_tokens = set()
+                    for lt in _liked:
+                        _liked_tokens |= _tokens(lt)
+                    filtered = []
+                    for t in topics:
+                        toks = _tokens(t)
+                        # 与 liked 集重叠 ≥2 个词 → 该主题与用户喜好矛盾，剔除
+                        if len(toks & _liked_tokens) >= 2:
+                            logging.getLogger(__name__).info(
+                                f"dislike主题「{t}」与liked主题重叠，已过滤")
+                            continue
+                        filtered.append(t)
+                    topics = filtered
         except Exception as e:
             logging.getLogger(__name__).warning(f"主题提取失败 {paper_id}: {e}")
             return
