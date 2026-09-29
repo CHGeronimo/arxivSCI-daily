@@ -9,6 +9,7 @@ Prohibited content: politics, ethnicity, religion, violence, pornography, terror
 The user values TIME above all. 80% of arXiv papers and 50% of journal papers are noise.
 When in doubt, rate DOWN. False negatives are acceptable; false positives waste the user's time.
 Only papers that genuinely advance the user's research should be "recommended" or above.
+IMPORTANT: "Advance" includes BOTH methodology AND application. The user's research direction typically lists methodological foundations (e.g. reinforcement learning, game theory, multi-agent systems, POMDP). Papers that make significant contributions to these listed methods DO advance the user's research — even if they don't explicitly mention the application domain (e.g. C2 systems). A strong MARL paper is "recommended" for a researcher whose methods include MARL; it does NOT need to be about command-and-control specifically. Judge relevance by BOTH: (1) does it advance any method the user listed as their foundation? (2) does it address the user's application domain? Either path qualifies for high relevance.
 
 ## Scoring Calibration
 

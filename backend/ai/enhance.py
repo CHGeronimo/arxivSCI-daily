@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # ENHANCE_VER：影响 tldr/评分/推荐等级的提示词或解析变更
 # CARD_VER：仅影响知识卡片提取的提示词/解析变更
 # CLUSTER_VER：聚类算法/提示词变更（只重聚类，不动底层卡片）
-ENHANCE_VER = "2026-09-19"   # 当前与旧全局戳同值（首次分层不触发重跑）
+ENHANCE_VER = "2026-09-29"   # 当前与旧全局戳同值（首次分层不触发重跑）
 CARD_VER = "2026-09-19"
 CLUSTER_VER = "2026-09-19"
 
