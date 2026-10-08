@@ -16,8 +16,13 @@ S2_PAPER_FIELDS = "title,abstract,authors,year,venue,citationCount,externalIds,p
 
 
 def search_authors(query: str, limit: int = 10) -> List[dict]:
-    """Search S2 for authors matching query. Returns list of author dicts."""
+    """Search S2 for authors, enrich affiliations from OpenAlex.
+
+    S2 的 affiliations 字段大部分为空（API 数据缺口），OpenAlex 有可靠的
+    last_known_institutions——按名字模糊匹配合并。
+    """
     params = {"query": query, "limit": limit, "fields": "name,affiliations,paperCount,externalIds"}
+    results: List[dict] = []
     for attempt in range(3):
         try:
             resp = httpx.get(S2_AUTHOR_SEARCH, params=params, timeout=15)
@@ -26,12 +31,50 @@ def search_authors(query: str, limit: int = 10) -> List[dict]:
                 time.sleep(2)
                 continue
             resp.raise_for_status()
-            return resp.json().get("data") or []
+            results = resp.json().get("data") or []
+            break
         except Exception as e:
             logger.warning(f"S2 作者搜索第 {attempt+1}/3 次尝试失败: {e}")
             if attempt < 2:
                 time.sleep(1)
-    return []
+
+    if not results:
+        return []
+
+    # OpenAlex 补全机构（S2 affiliations 大多为空）
+    try:
+        from .openalex_client import openalex_get
+        oa_data = openalex_get("https://api.openalex.org/authors",
+                               {"search": query, "per-page": min(limit, 10)})
+        if oa_data and isinstance(oa_data.get("results"), list):
+            # 按归一化名字建索引：OpenAlex 的机构 → 名字
+            def _norm(n):
+                return "".join(c for c in n.lower() if c.isalnum())
+            oa_by_name: dict = {}
+            for oa in oa_data["results"]:
+                name = oa.get("display_name", "")
+                insts = oa.get("last_known_institutions") or []
+                inst = insts[0].get("display_name", "") if insts else ""
+                country = insts[0].get("country_code", "") if insts else ""
+                if inst:
+                    label = f"{inst} ({country})" if country else inst
+                    oa_by_name[_norm(name)] = label
+            # 合并到 S2 结果
+            for a in results:
+                if not (a.get("affiliations") or []):
+                    matched = oa_by_name.get(_norm(a.get("name", "")))
+                    if not matched:
+                        # 尝试宽松匹配（名字包含关系）
+                        for oa_name, inst in oa_by_name.items():
+                            if _norm(a.get("name", "")) in oa_name or oa_name in _norm(a.get("name", "")):
+                                matched = inst
+                                break
+                    if matched:
+                        a["affiliations"] = [matched]
+    except Exception as e:
+        logger.debug(f"OpenAlex 机构补全跳过: {e}")
+
+    return results
 
 
 def get_author_papers(
