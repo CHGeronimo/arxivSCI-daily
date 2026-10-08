@@ -49,7 +49,12 @@ def search_authors(query: str, limit: int = 10) -> List[dict]:
         if oa_data and isinstance(oa_data.get("results"), list):
             # 按归一化名字建索引：OpenAlex 的机构 → 名字
             def _norm(n):
-                return "".join(c for c in n.lower() if c.isalnum())
+                """首名+尾名匹配（跳过中间名缩写，解决 'Stuart J. Russell'
+                vs 'Stuart Russell' 的归一化不等问题）。"""
+                tokens = [t for t in n.lower().replace(".", " ").split() if len(t) > 1]
+                if len(tokens) >= 2:
+                    return tokens[0] + tokens[-1]  # 首名+尾名
+                return "".join(tokens)
             oa_by_name: dict = {}
             for oa in oa_data["results"]:
                 name = oa.get("display_name", "")
