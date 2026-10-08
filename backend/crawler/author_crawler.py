@@ -55,15 +55,23 @@ def search_authors(query: str, limit: int = 10) -> List[dict]:
                 if len(tokens) >= 2:
                     return tokens[0] + tokens[-1]  # 首名+尾名
                 return "".join(tokens)
-            oa_by_name: dict = {}
+            # 同名多个候选：按作品数取最知名的（避免小众同名覆盖大牛）
+            oa_candidates: dict = {}  # norm_name → [(inst, works_count), ...]
             for oa in oa_data["results"]:
                 name = oa.get("display_name", "")
                 insts = oa.get("last_known_institutions") or []
                 inst = insts[0].get("display_name", "") if insts else ""
                 country = insts[0].get("country_code", "") if insts else ""
+                works = oa.get("works_count", 0)
                 if inst:
                     label = f"{inst} ({country})" if country else inst
-                    oa_by_name[_norm(name)] = label
+                    key = _norm(name)
+                    oa_candidates.setdefault(key, []).append((label, works))
+            # 每个名字只留作品数最多的机构
+            oa_by_name = {}
+            for key, cands in oa_candidates.items():
+                cands.sort(key=lambda x: -x[1])
+                oa_by_name[key] = cands[0][0]
             # 合并到 S2 结果
             for a in results:
                 if not (a.get("affiliations") or []):
