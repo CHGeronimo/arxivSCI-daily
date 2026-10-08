@@ -912,15 +912,33 @@ async function searchAuthors(query) {
             return;
         }
         const subscribedIds = new Set((subscriptions.authors || []).map(a => a.authorId));
+        // 机构彩色标识（与订阅列表同款 8 色 hash）
+        const INST_COLORS = ['#818cf8','#34d399','#f472b6','#fbbf24','#60a5fa','#fb923c','#2dd4bf','#c084fc'];
+        const _instColor = (name) => {
+            let h = 0; for (const c of (name || '?')) h = (h * 31 + c.charCodeAt(0)) & 0x7fffffff;
+            return INST_COLORS[h % INST_COLORS.length];
+        };
+        const _sc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
         resultsEl.innerHTML = authors.map(a => {
             const subbed = subscribedIds.has(a.authorId);
             const aff = a.affiliations?.[0] || '';
+            const color = _instColor(aff || a.name);
             const orcid = a.externalIds?.ORCID || a._orcid || '';
             const orcidTag = orcid ? `<span style="font-size:0.7rem;background:rgba(168,85,247,0.15);color:#a855f7;padding:1px 5px;border-radius:3px;margin-left:4px">ORCID</span>` : '';
-            return `<div class="author-search-item" style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-bottom:1px solid var(--border)">
+            const instDot = aff
+                ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:0.72rem;color:var(--text-2);margin-right:6px">
+                     <span style="width:8px;height:8px;border-radius:50%;background:${color};flex:none;display:inline-block"></span>
+                     ${_sc(aff)}
+                   </span>`
+                : '';
+            return `<div class="author-search-item" style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px;border-bottom:1px solid var(--border)">
                 <div style="min-width:0;flex:1">
-                    <div style="font-size:0.88rem;font-weight:500">${a.name}${orcidTag}</div>
-                    <div style="font-size:0.75rem;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${aff}${aff ? ' · ' : ''}${a.paperCount || 0} 篇论文${orcid ? ' · ' + orcid : ''}</div>
+                    <div style="font-size:0.88rem;font-weight:500">${_sc(a.name)}${orcidTag}</div>
+                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:2px">
+                        ${instDot}
+                        <span style="font-size:0.72rem;color:var(--text-3)">${a.paperCount || 0} 篇${orcid ? ' · ' + _sc(orcid) : ''}</span>
+                    </div>
                 </div>
                 <button class="btn btn--secondary ${subbed ? 'followed' : ''}" data-author-id="${a.authorId}" data-author-name="${a.name}" data-author-aff="${aff}" data-author-papers="${a.paperCount || 0}" style="font-size:0.78rem;padding:4px 10px;flex-shrink:0">${subbed ? '✓ 已关注' : '+ 关注'}</button>
             </div>`;
