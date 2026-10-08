@@ -930,10 +930,18 @@ async function searchAuthors(query) {
     }
 }
 
-function followAuthor(authorId, name, affiliation, paperCount) {
+async function followAuthor(authorId, name, affiliation, paperCount) {
+    // 尝试丰富作者信息（领域推断）
+    let domains = [];
+    try {
+        const r = await fetch(`/api/author/enrich?name=${encodeURIComponent(name)}&id=${authorId}`);
+        if (r.ok) { const d = await r.json(); domains = d.domains || []; if (d.affiliation && !affiliation) affiliation = d.affiliation; }
+    } catch { /* 静默 */ }
+
     if (!subscriptions.authors) subscriptions.authors = [];
     if (subscriptions.authors.some(a => a.authorId === authorId)) return;
     subscriptions.authors.push({
+        domains,
         name,
         authorId,
         affiliation: affiliation || '',
@@ -958,15 +966,38 @@ function renderSubscribedAuthors() {
         container.innerHTML = '<p class="empty-hint">暂无关注作者。在上方搜索添加。</p>';
         return;
     }
-    container.innerHTML = authors.map(a => `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
-            <div>
-                <div style="font-size:0.88rem;font-weight:500">${a.name}</div>
-                <div style="font-size:0.75rem;color:var(--text-2)">${a.affiliation || ''}${a.affiliation ? ' · ' : ''}${a.paperCount || 0} 篇</div>
+    const INST_COLORS = ['#818cf8','#34d399','#f472b6','#fbbf24','#60a5fa','#fb923c','#2dd4bf','#c084fc'];
+    const _instColor = (name) => {
+        let h = 0; for (const c of (name || '?')) h = (h * 31 + c.charCodeAt(0)) & 0x7fffffff;
+        return INST_COLORS[h % INST_COLORS.length];
+    };
+    const _esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+    container.innerHTML = authors.map(a => {
+        const inst = a.affiliation || '';
+        const color = _instColor(inst || a.name);
+        const domains = (a.domains || []).map(d =>
+            `<span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:0.68rem;background:var(--accent-muted);color:var(--accent-primary);margin-right:3px">${_esc(d)}</span>`
+        ).join('');
+        const instBadge = inst
+            ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:0.72rem;color:var(--text-2)">
+                 <span style="width:8px;height:8px;border-radius:50%;background:${color};flex:none"></span>
+                 ${_esc(inst)}
+               </span>`
+            : '';
+        return `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+            <div style="flex:1;min-width:0">
+                <div style="font-size:0.88rem;font-weight:500">${_esc(a.name)}</div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:2px">
+                    ${instBadge}
+                    <span style="font-size:0.72rem;color:var(--text-3)">${a.paperCount || 0} 篇</span>
+                </div>
+                ${domains ? `<div style="margin-top:3px">${domains}</div>` : ''}
             </div>
             <button class="unfollow-btn" data-unfollow-author="${a.authorId}">取消关注</button>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 }
 
 document.addEventListener('DOMContentLoaded', () => {

@@ -1859,6 +1859,26 @@ def _update_profile_from_feedback(paper_id: str, rating: str):
 
 # ── Author Search ─────────────────────────────────────────────────
 
+@app.route("/api/author/enrich", methods=["GET"])
+def enrich_author():
+    """丰富作者信息：从论文库推断研究领域 + S2 详情。"""
+    name = request.args.get("name", "").strip()
+    author_id = request.args.get("id", "").strip()
+    if not name:
+        return jsonify({"domains": [], "affiliation": "", "homepage": ""})
+
+    from backend.crawler.author_crawler import infer_author_domains, enrich_author_info
+    result = {"domains": [], "affiliation": "", "homepage": ""}
+    try:
+        if author_id:
+            result = enrich_author_info(author_id, name)
+        else:
+            result["domains"] = infer_author_domains(name)
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"作者信息丰富失败: {e}")
+    return jsonify(result)
+
+
 @app.route("/api/author/search", methods=["GET"])
 def search_author_api():
     query = request.args.get("query", "").strip()

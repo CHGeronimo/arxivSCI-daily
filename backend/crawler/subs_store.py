@@ -15,6 +15,8 @@ class Author:
     affiliation: str = ""
     paper_count: int = 0
     last_updated: Optional[str] = None
+    domains: list = field(default_factory=list)  # 研究领域标签（从论文推断）
+    homepage: str = ""
 
 
 @dataclass

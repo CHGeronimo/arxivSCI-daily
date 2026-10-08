@@ -148,6 +148,99 @@ class AuthorCrawler:
         return list(self.crawl_iter())
 
 
+def infer_author_domains(author_name: str, conn=None) -> list:
+    """从论文库推断作者研究领域：分析其论文的 categories + venue + AI 关键词。
+
+    返回最多 3 个领域标签（如 "cs.MA 多智能体"、"网络安全"）。
+    """
+    import json as _json
+    if conn is None:
+        from backend.db import get_conn
+        conn = get_conn()
+
+    # 在 papers 表的 authors JSON 数组中匹配
+    rows = conn.execute("""
+        SELECT p.categories, p.venue, p.source,
+               a.tldr, a.method
+        FROM papers p
+        LEFT JOIN ai_results a ON p.id = a.paper_id
+        WHERE p.authors LIKE ?
+        ORDER BY p.created_at DESC LIMIT 20
+    """, (f'%"{author_name}"%',)).fetchall()
+
+    if not rows:
+        return []
+
+    # 统计 arXiv 分类
+    cat_counter: dict = {}
+    for r in rows:
+        cats = r["categories"]
+        if isinstance(cats, str):
+            try:
+                cats = _json.loads(cats)
+            except (ValueError, TypeError):
+                cats = []
+        for c in (cats or []):
+            if isinstance(c, str) and c.startswith("cs."):
+                cat_counter[c] = cat_counter.get(c, 0) + 1
+
+    # 常见领域中文映射
+    CAT_LABELS = {
+        "cs.MA": "多智能体", "cs.GT": "博弈论", "cs.LG": "机器学习",
+        "cs.AI": "人工智能", "cs.CL": "自然语言", "cs.CV": "计算机视觉",
+        "cs.CR": "网络安全", "cs.SY": "控制系统", "cs.RO": "机器人",
+        "cs.DC": "分布式", "cs.NI": "网络", "cs.HC": "人机交互",
+        "eess.SP": "信号处理", "eess.SY": "电子系统", "math.OC": "优化",
+    }
+
+    domains = []
+    # 按出现频次取 top 3
+    for cat, cnt in sorted(cat_counter.items, key=lambda x: -x[1])[:3] if hasattr(cat_counter, 'items') else sorted(cat_counter.items(), key=lambda x: -x[1])[:3]:
+        label = CAT_LABELS.get(cat, cat)
+        if label not in domains:
+            domains.append(label)
+
+    # 如果没有 arXiv 分类，从 venue 推断
+    if not domains:
+        venues = {r["venue"] or "" for r in rows}
+        for v in venues:
+            v_lower = v.lower()
+            if "security" in v_lower and "网络安全" not in domains:
+                domains.append("网络安全")
+            elif "machine learn" in v_lower or "neural" in v_lower:
+                if "机器学习" not in domains: domains.append("机器学习")
+            elif "multi-agent" in v_lower or "distributed" in v_lower:
+                if "多智能体" not in domains: domains.append("多智能体")
+            if len(domains) >= 3:
+                break
+
+    return domains[:3]
+
+
+def enrich_author_info(author_id: str, author_name: str) -> dict:
+    """丰富作者信息：S2 详情 + 领域推断。返回补充的字段。"""
+    extra = {"domains": [], "homepage": "", "affiliation": ""}
+
+    # 1. S2 详情（affiliations 常为空但试一下）
+    try:
+        url = f"{S2_AUTHOR_PAPERS}/{author_id}"
+        resp = httpx.get(url.replace("/papers", ""),
+                        params={"fields": "name,affiliations,homepage"}, timeout=10)
+        if resp.status_code == 200:
+            d = resp.json()
+            affs = d.get("affiliations") or []
+            if affs:
+                extra["affiliation"] = affs[0]
+            extra["homepage"] = d.get("homepage") or ""
+    except Exception:
+        pass
+
+    # 2. 从论文库推断领域
+    extra["domains"] = infer_author_domains(author_name)
+
+    return extra
+
+
 def resolve_orcid_to_author(orcid_id: str) -> dict | None:
     """Resolve an ORCID ID to an S2 author via name lookup.
 
