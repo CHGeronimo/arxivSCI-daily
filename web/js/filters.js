@@ -228,11 +228,14 @@ export function applyFiltersAndSort() {
                         const q = term.slice(prefix.length);
                         if (!q) return true;
                         if (field === 'authors') return (p.authors || []).some(a => a.toLowerCase().includes(q));
-                        const val = ((p.AI || {}).title_zh || p.title || '').toLowerCase();
+                        const val = (((p.AI || {}).title_zh || '') + ' ' + (p.title || '')).toLowerCase();
                         return val.includes(q);
                     }
                 }
-                const allText = ((p.AI || {}).title_zh || p.title || '') + ' ' +
+                // 中英标题都要搜（原来 title_zh || title 是 OR——
+                // 有中文标题时英文搜索词永远匹配不到）
+                const allText = ((p.AI || {}).title_zh || '') + ' ' +
+                    (p.title || '') + ' ' +
                     ((p.AI || {}).tldr || '') + ' ' +
                     (p.authors || []).join(' ');
                 return allText.toLowerCase().includes(term);
