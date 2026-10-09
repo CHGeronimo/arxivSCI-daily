@@ -371,21 +371,26 @@ def put_profile():
     if profile_path.exists():
         try:
             merged = json.loads(profile_path.read_text(encoding="utf-8"))
+            merged["_old_direction_for_compare"] = merged.get("direction", "")
         except Exception:
             merged = {}
     merged.update(data)
-    _write_profile_atomic(merged)
+    with _profile_lock:
+        _write_profile_atomic(merged)
     reset_ai_chain()
-    # 方向变更时清除全部版本戳——旧结果是按旧方向处理的，需重跑
-    import sqlite3 as _sq
-    try:
-        _c = get_conn()
-        _c.execute("UPDATE ai_results SET pipeline_version = NULL")
-        _c.execute("UPDATE knowledge_cards SET card_version = NULL")
-        _c.commit()
-        logging.getLogger(__name__).info("研究方向已变更，清除全部版本戳（待重跑）")
-    except Exception as _e:
-        logging.getLogger(__name__).warning(f"清戳失败: {_e}")
+    # 仅 direction 实质变更时清戳——topic-only 保存不清（原来无条件清，
+    # 导致加/删一个偏好 chip 就把全库标为"待重跑"，烧 9-14h LLM 配额）
+    old_direction = merged.get("_old_direction_for_compare", "")
+    if data.get("direction", "") != old_direction:
+        try:
+            _c = get_conn()
+            _c.execute("UPDATE ai_results SET pipeline_version = NULL")
+            _c.execute("UPDATE knowledge_cards SET card_version = NULL")
+            _c.execute("UPDATE knowledge_clusters SET cluster_version = NULL")
+            _c.commit()
+            logging.getLogger(__name__).info("研究方向已实质变更，清除全部版本戳（待重跑）")
+        except Exception as _e:
+            logging.getLogger(__name__).warning(f"清戳失败: {_e}")
     return jsonify(merged)
 
 
@@ -778,6 +783,13 @@ def put_llm_config():
         os.environ[k] = v
     for v in removes:
         os.environ.pop(v, None)
+    # 刷新缓存链——model/base_url 是构造参数固化在 ChatOpenAI 实例里，
+    # 不刷新则抓取管线继续打到旧端点逐篇失败（审计 P1）
+    try:
+        from backend.paper_store import reset_ai_chain
+        reset_ai_chain()
+    except Exception:
+        pass
     logging.getLogger(__name__).info(
         f"LLM 供应商切换: {prev_pid} → {pid}（{model} @ {base_url}，Key {_mask_key(key)}）"
     )
@@ -1183,9 +1195,10 @@ def _retro_knowledge_extract():
         }
         card = extract_knowledge_card(paper, profile)
         if card:
+            from backend.ai.enhance import CARD_VER
             queue_write(
-                "INSERT OR REPLACE INTO knowledge_cards (paper_id, problem, method_extracted, result_extracted, keywords, relation_to_profile) VALUES (?,?,?,?,?,?)",
-                (card["paper_id"], card["problem"], card["method_extracted"], card["result_extracted"], card["keywords"], card["relation_to_profile"]),
+                "INSERT OR REPLACE INTO knowledge_cards (paper_id, problem, method_extracted, result_extracted, keywords, relation_to_profile, card_version) VALUES (?,?,?,?,?,?,?)",
+                (card["paper_id"], card["problem"], card["method_extracted"], card["result_extracted"], card["keywords"], card["relation_to_profile"], CARD_VER),
             )
         if (i + 1) % 50 == 0 or (i + 1) == len(rows):
             logger.info(f"知识卡片进度: {i + 1}/{len(rows)}")
@@ -1968,6 +1981,9 @@ def delete_paper(paper_id: str):
 @app.route("/api/papers/before/<date_str>", methods=["DELETE"])
 def delete_papers_before_date(date_str: str):
     """Delete all papers published before the given date (YYYY-MM-DD). Records as ignored."""
+    import re as _re
+    if not _re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_str):
+        return jsonify({"error": f"日期格式需为 YYYY-MM-DD，收到: {date_str}"}), 400
     conn = get_conn()
     ids = [r[0] for r in conn.execute("SELECT id FROM papers WHERE published_date < ?", (date_str,)).fetchall()]
     if ids:
@@ -2003,7 +2019,9 @@ def purge_papers():
 
     if data.get("older_than_days"):
         cutoff = f"datetime('now', '-{int(data['older_than_days'])} days')"
-        rows = conn.execute(f"SELECT id FROM papers WHERE published_date < date({cutoff})").fetchall()
+        rows = conn.execute(f"""SELECT id FROM papers WHERE published_date < date({cutoff})
+            AND NOT EXISTS (SELECT 1 FROM feedback f WHERE f.paper_id = papers.id
+                            AND (f.rating = 'like' OR f.bookmarked = 1))""").fetchall()
         ids = [r[0] for r in rows]
         if ids:
             _delete_papers_with_children(conn, ids)

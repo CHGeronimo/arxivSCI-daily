@@ -1,6 +1,7 @@
 // js/app.js — entry point
 
 import {
+    allPapers,
     setAllPapers, setRefreshTimer, setSortOrder, setCurrentPage,
     refreshTimer, toggleBookmark, showToast, syncServerFlags, restoreUIState,
     filteredPapers, currentPage, setCurrentTheme, currentTheme, setSidebarOpen, sidebarOpen,
@@ -856,6 +857,7 @@ document.getElementById('btn-check-idea')?.addEventListener('click', async (e) =
                     emptyEl.innerHTML = '<p>分析失败</p><p class="hint">请稍后重试</p>';
                     emptyEl.style.display = '';
                 }
+                btn.disabled = false; btn.textContent = orig;
                 return;
             }
             const gaugeColors = {high: 'var(--success)', medium: 'var(--warning)', low: 'var(--danger)'};

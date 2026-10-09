@@ -190,7 +190,7 @@ export function inferType(p) {
     const doi = p.doi || '';
     if (doi.includes('/s41586-')) return 'research';
     if (doi.includes('/d41586-')) return 'news';
-    return p.summary ? 'research' : 'news';
+    return p.source && p.source !== 'crossref' ? 'research' : (p.summary ? 'research' : 'news');
 }
 
 export let feedbackData = {};
