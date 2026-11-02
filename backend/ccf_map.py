@@ -105,7 +105,7 @@ CCF_MAP = {
     "type": "conference"
   },
   "IROS": {
-    "tier": "B",
+    "tier": "C",
     "domain": "人工智能",
     "type": "conference"
   },
@@ -295,7 +295,7 @@ CCF_MAP = {
     "type": "conference"
   },
   "WISE": {
-    "tier": "C",
+    "tier": "B",
     "domain": "数据库/数据挖掘/内容检索",
     "type": "conference"
   },
@@ -336,8 +336,8 @@ CCF_MAP = {
   },
   "DCC": {
     "tier": "B",
-    "domain": "网络与信息安全",
-    "type": "journal"
+    "domain": "计算机图形学与多媒体",
+    "type": "conference"
   },
   "Eurographics": {
     "tier": "B",
@@ -400,7 +400,7 @@ CCF_MAP = {
     "type": "conference"
   },
   "PG": {
-    "tier": "C",
+    "tier": "B",
     "domain": "计算机图形学与多媒体",
     "type": "conference"
   },
@@ -476,8 +476,8 @@ CCF_MAP = {
   },
   "CSL": {
     "tier": "C",
-    "domain": "人工智能",
-    "type": "journal"
+    "domain": "计算机科学理论",
+    "type": "conference"
   },
   "FSTTCS": {
     "tier": "C",
@@ -510,7 +510,7 @@ CCF_MAP = {
     "type": "conference"
   },
   "SAT": {
-    "tier": "C",
+    "tier": "B",
     "domain": "计算机科学理论",
     "type": "conference"
   },
@@ -595,7 +595,7 @@ CCF_MAP = {
     "type": "conference"
   },
   "MSR": {
-    "tier": "B",
+    "tier": "C",
     "domain": "软件工程/系统软件/程序设计语言",
     "type": "conference"
   },
@@ -810,12 +810,12 @@ CCF_MAP = {
     "type": "conference"
   },
   "AsiaCCS": {
-    "tier": "B",
+    "tier": "C",
     "domain": "网络与信息安全",
     "type": "conference"
   },
   "EuroS&P": {
-    "tier": "B",
+    "tier": "C",
     "domain": "网络与信息安全",
     "type": "conference"
   },
@@ -1000,12 +1000,12 @@ CCF_MAP = {
     "type": "conference"
   },
   "HiPEAC": {
-    "tier": "C",
+    "tier": "B",
     "domain": "计算机体系结构/并行与分布计算/存储系统",
     "type": "conference"
   },
   "ICS": {
-    "tier": "C",
+    "tier": "B",
     "domain": "计算机体系结构/并行与分布计算/存储系统",
     "type": "conference"
   },
@@ -1033,6 +1033,28 @@ CCF_MAP = {
     "tier": "A",
     "domain": "人机交互与普适计算",
     "type": "conference"
+  },
+  "IMWUT": {
+    "tier": "A",
+    "domain": "人机交互与普适计算",
+    "type": "conference"
+  },
+  "UbiComp/IMWUT": {
+    "tier": "A",
+    "domain": "人机交互与普适计算",
+    "type": "conference"
+  },
+  "Proceedings of the ACM on Interactive, Mobile, Wearable and Ubiquitous Technologies": {
+    "tier": "A",
+    "domain": "人机交互与普适计算",
+    "type": "conference",
+    "abbr": "IMWUT"
+  },
+  "Proc. ACM Interact. Mob. Wearable Ubiquitous Technol.": {
+    "tier": "A",
+    "domain": "人机交互与普适计算",
+    "type": "conference",
+    "abbr": "IMWUT"
   },
   "UIST": {
     "tier": "A",
@@ -4138,5 +4160,260 @@ CCF_MAP = {
     "domain": "交叉/综合/新兴",
     "type": "journal",
     "abbr": "ACMDLT"
+  },
+  "MSST": {
+    "tier": "B",
+    "domain": "计算机体系结构/并行与分布计算/存储系统",
+    "type": "conference"
+  },
+  "SIGMETRICS": {
+    "tier": "B",
+    "domain": "计算机体系结构/并行与分布计算/存储系统",
+    "type": "conference"
+  },
+  "SIG-METRICS": {
+    "tier": "B",
+    "domain": "计算机体系结构/并行与分布计算/存储系统",
+    "type": "conference"
+  },
+  "ICPADS": {
+    "tier": "C",
+    "domain": "计算机体系结构/并行与分布计算/存储系统",
+    "type": "conference"
+  },
+  "IEEE International Conference on Parallel and Distributed Systems": {
+    "tier": "C",
+    "domain": "计算机体系结构/并行与分布计算/存储系统",
+    "type": "conference",
+    "abbr": "ICPADS"
+  },
+  "ISLPED": {
+    "tier": "C",
+    "domain": "计算机体系结构/并行与分布计算/存储系统",
+    "type": "conference"
+  },
+  "PVLDB": {
+    "tier": "A",
+    "domain": "数据库/数据挖掘/内容检索",
+    "type": "conference"
+  },
+  "Proceedings of the VLDB Endowment": {
+    "tier": "A",
+    "domain": "数据库/数据挖掘/内容检索",
+    "type": "conference",
+    "abbr": "PVLDB"
+  },
+  "PACMHCI": {
+    "tier": "C",
+    "domain": "人机交互与普适计算",
+    "type": "journal"
+  },
+  "Proceedings of the ACM on Human-Computer Interaction": {
+    "tier": "C",
+    "domain": "人机交互与普适计算",
+    "type": "journal",
+    "abbr": "PACMHCI"
+  },
+  "DFRWS": {
+    "tier": "C",
+    "domain": "网络与信息安全",
+    "type": "conference"
+  },
+  "TASAE": {
+    "tier": "B",
+    "domain": "交叉/综合/新兴",
+    "type": "journal"
+  },
+  "IEEE TASE": {
+    "tier": "B",
+    "domain": "交叉/综合/新兴",
+    "type": "journal",
+    "abbr": "TASAE"
+  },
+  "International Conference on Architectural Support for Programming Languages and Operating Systems": {
+    "tier": "A",
+    "domain": "计算机体系结构/并行与分布计算/存储系统",
+    "type": "conference",
+    "abbr": "ASPLOS"
+  },
+  "International Symposium on Computer Architecture": {
+    "tier": "A",
+    "domain": "计算机体系结构/并行与分布计算/存储系统",
+    "type": "conference",
+    "abbr": "ISCA"
+  },
+  "IEEE International Conference on Computer Vision": {
+    "tier": "A",
+    "domain": "人工智能",
+    "type": "conference",
+    "abbr": "ICCV"
+  },
+  "International Conference on Learning Representations": {
+    "tier": "A",
+    "domain": "人工智能",
+    "type": "conference",
+    "abbr": "ICLR"
+  },
+  "Neural Information Processing Systems": {
+    "tier": "A",
+    "domain": "人工智能",
+    "type": "conference",
+    "abbr": "NeurIPS"
+  },
+  "Advances in Neural Information Processing Systems": {
+    "tier": "A",
+    "domain": "人工智能",
+    "type": "conference",
+    "abbr": "NeurIPS"
+  },
+  "International Conference on 3D Vision": {
+    "tier": "C",
+    "domain": "计算机图形学与多媒体",
+    "type": "conference",
+    "abbr": "3DV"
+  },
+  "Design, Automation and Test in Europe": {
+    "tier": "B",
+    "domain": "计算机体系结构/并行与分布计算/存储系统",
+    "type": "conference",
+    "abbr": "DATE"
+  },
+  "Design, Automation & Test in Europe": {
+    "tier": "B",
+    "domain": "计算机体系结构/并行与分布计算/存储系统",
+    "type": "conference",
+    "abbr": "DATE"
+  },
+  "ACM TOCS": {
+    "tier": "A",
+    "domain": "计算机体系结构/并行与分布计算/存储系统",
+    "type": "journal",
+    "abbr": "TOCS"
+  },
+  "ACM TALG": {
+    "tier": "B",
+    "domain": "计算机科学理论",
+    "type": "journal",
+    "abbr": "TALG"
+  },
+  "ACM TACO": {
+    "tier": "A",
+    "domain": "计算机体系结构/并行与分布计算/存储系统",
+    "type": "journal",
+    "abbr": "TACO"
+  },
+  "ACM TECS": {
+    "tier": "B",
+    "domain": "计算机体系结构/并行与分布计算/存储系统",
+    "type": "journal",
+    "abbr": "TECS"
+  },
+  "ACM TIST": {
+    "tier": "C",
+    "domain": "数据库/数据挖掘/内容检索",
+    "type": "journal",
+    "abbr": "TIST"
+  },
+  "ACM TOMS": {
+    "tier": "B",
+    "domain": "计算机科学理论",
+    "type": "journal",
+    "abbr": "TOMS"
+  },
+  "ACM TOPS": {
+    "tier": "B",
+    "domain": "网络与信息安全",
+    "type": "journal",
+    "abbr": "TOPS"
+  },
+  "ACM TRETS": {
+    "tier": "B",
+    "domain": "计算机体系结构/并行与分布计算/存储系统",
+    "type": "journal",
+    "abbr": "TRETS"
+  },
+  "ACM TOSN": {
+    "tier": "B",
+    "domain": "计算机网络",
+    "type": "journal",
+    "abbr": "TOSN"
+  },
+  "ACM TWEB": {
+    "tier": "B",
+    "domain": "数据库/数据挖掘/内容检索",
+    "type": "journal",
+    "abbr": "TWEB"
+  },
+  "IEEE TIOT": {
+    "tier": "C",
+    "domain": "计算机网络",
+    "type": "journal",
+    "abbr": "TIOT"
+  },
+  "IEEE JSAC": {
+    "tier": "A",
+    "domain": "计算机网络",
+    "type": "journal",
+    "abbr": "JSAC"
+  },
+  "IEEE TCC": {
+    "tier": "B",
+    "domain": "计算机体系结构/并行与分布计算/存储系统",
+    "type": "journal",
+    "abbr": "TCC"
+  },
+  "IEEE TCOMM": {
+    "tier": "B",
+    "domain": "计算机网络",
+    "type": "journal",
+    "abbr": "TCOMM"
+  },
+  "IEEE TCYB": {
+    "tier": "B",
+    "domain": "人工智能",
+    "type": "journal",
+    "abbr": "TCYB"
+  },
+  "IEEE TEC": {
+    "tier": "B",
+    "domain": "人工智能",
+    "type": "journal",
+    "abbr": "TEC"
+  },
+  "IEEE TFS": {
+    "tier": "B",
+    "domain": "人工智能",
+    "type": "journal",
+    "abbr": "TFS"
+  },
+  "IEEE TIT": {
+    "tier": "A",
+    "domain": "计算机科学理论",
+    "type": "journal",
+    "abbr": "TIT"
+  },
+  "IEEE TMM": {
+    "tier": "A",
+    "domain": "计算机图形学与多媒体",
+    "type": "journal",
+    "abbr": "TMM"
+  },
+  "IEEE TNSM": {
+    "tier": "C",
+    "domain": "计算机网络",
+    "type": "journal",
+    "abbr": "TNSM"
+  },
+  "IEEE TRO": {
+    "tier": "B",
+    "domain": "交叉/综合/新兴",
+    "type": "journal",
+    "abbr": "TRO"
+  },
+  "IEEE TWC": {
+    "tier": "B",
+    "domain": "计算机网络",
+    "type": "journal",
+    "abbr": "TWC"
   }
 }

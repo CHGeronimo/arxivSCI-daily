@@ -509,13 +509,10 @@ _IEEE_ABBREV = {
     "IEEE TRANSACTIONS ON AUTOMATION SCIENCE AND ENGINEERING": "IEEE TASE",
     "IEEE TRANSACTIONS ON COMPUTER-AIDED DESIGN OF INTEGRATED CIRCUITS AND SYSTEMS": "IEEE TCAD",
     "IEEE TRANSACTIONS ON CIRCUITS AND SYSTEMS FOR VIDEO TECHNOLOGY": "IEEE TCSVT",
-    "IEEE TRANSACTIONS ON SIGNAL PROCESSING": "IEEE TSP",
     "IEEE TRANSACTIONS ON FUZZY SYSTEMS": "IEEE TFS",
     "IEEE TRANSACTIONS ON EVOLUTIONARY COMPUTATION": "IEEE TEC",
-    "IEEE TRANSACTIONS ON INTELLIGENT SYSTEMS": "IEEE TIS",
     "IEEE TRANSACTIONS ON SERVICES COMPUTING": "IEEE TSC",
     "IEEE TRANSACTIONS ON NETWORK AND SERVICE MANAGEMENT": "IEEE TNSM",
-    "IEEE TRANSACTIONS ON INSTRUMENTATION AND MEASUREMENT": "IEEE TIM",
     "IEEE INTERNET OF THINGS JOURNAL": "IEEE TIOT",
     "IEEE JOURNAL ON SELECTED AREAS IN COMMUNICATIONS": "IEEE JSAC",
     "IEEE ACCESS": "IEEE ACCESS",
@@ -537,7 +534,6 @@ _IEEE_ABBREV = {
     "ACM TRANSACTIONS ON ARCHITECTURE AND CODE OPTIMIZATION": "ACM TACO",
     "ACM TRANSACTIONS ON PRIVACY AND SECURITY": "ACM TOPS",
     "ACM TRANSACTIONS ON RECONFIGURABLE TECHNOLOGY AND SYSTEMS": "ACM TRETS",
-    "ACM COMPUTING SURVEYS": "ACM CSUR",
     "ACM TRANSACTIONS ON GRAPHICS": "TOG",
     "IEEE TRANSACTIONS ON INTELLIGENT TRANSPORTATION SYSTEMS": "TITS",
     "IEEE TRANSACTIONS ON MOBILE COMPUTING": "TMC",
@@ -558,6 +554,21 @@ def _normalize_venue(field: str) -> str:
         if full in up or up in full:
             return abbrev
     return field
+
+
+_CCF_NORM_KEYS: list[tuple[str, str]] | None = None
+
+
+def _ccf_norm_keys() -> list[tuple[str, str]]:
+    """(punctuation-stripped uppercase key, tier) pairs, computed once."""
+    global _CCF_NORM_KEYS
+    if _CCF_NORM_KEYS is None:
+        import re as _re
+        _CCF_NORM_KEYS = [
+            (_re.sub(r'[^A-Z0-9]+', ' ', k.upper()).strip(), v["tier"])
+            for k, v in CCF_MAP.items()
+        ]
+    return _CCF_NORM_KEYS
 
 
 def _match_ccf(venue: str, journal_title: str) -> str:
@@ -581,12 +592,12 @@ def _match_ccf(venue: str, journal_title: str) -> str:
         stripped = re.sub(r'\s+\d{4}$', '', field).strip()
         if stripped in CCF_MAP:
             return CCF_MAP[stripped]["tier"]
-        # Keyword match: >= 4 chars substring or word-boundary for shorter keys
-        upper = field.upper()
-        for key, val in CCF_MAP.items():
-            ku = key.upper()
+        # Keyword match: >= 4 chars substring, punctuation-insensitive
+        # (Crossref 常丢逗号: "Interactive Mobile Wearable" vs 标准名 "Interactive, Mobile, Wearable")
+        upper = re.sub(r'[^A-Z0-9]+', ' ', field.upper()).strip()
+        for ku, tier in _ccf_norm_keys():
             if len(ku) >= 4 and ku in upper:
-                return val["tier"]
+                return tier
     return ""
 
 
