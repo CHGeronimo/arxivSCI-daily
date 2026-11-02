@@ -547,8 +547,9 @@ def get_jobs():
 # ── Runtime Settings（前端可改的抓取/调度配置）────────────────────
 
 _SETTINGS_META = {
-    "NIGHT_START": {"label": "每日起始小时（0-23，默认2=凌晨）", "type": "int", "min": 0, "max": 23, "restart": False},
+    "NIGHT_START": {"label": "每日起始小时（0-23，默认0=午夜起跑）", "type": "int", "min": 0, "max": 23, "restart": False},
     "STAGGER_MINUTES": {"label": "任务错峰间隔分钟（5-120）", "type": "int", "min": 5, "max": 120, "restart": False},
+    "NIGHT_DEADLINE_MIN": {"label": "夜窗硬截止=起始后N分钟,到点停AI补全次日(0=不限,150=2:30)", "type": "int", "min": 0, "max": 720, "restart": False},
     "RUN_ON_START": {"label": "daemon 启动立即全量跑一轮", "type": "bool", "restart": True},
     "DBLP_ROTATE_DAYS": {"label": "DBLP 会议轮换天数（1=每天全量）", "type": "int", "min": 1, "max": 30, "restart": False},
     "S2_ROTATE_DAYS": {"label": "S2 关键词轮换天数（1=每天全量）", "type": "int", "min": 1, "max": 30, "restart": False},
@@ -559,6 +560,7 @@ _SETTINGS_META = {
     "LLM_NIGHT_CONCURRENCY": {"label": "LLM 凌晨并发（低峰可放宽，如 9）", "type": "int", "min": 1, "max": 12, "restart": False},
     "CONVERGE_PCT": {"label": "夜间收敛百分比（每轮处理旧版量%，1-50）", "type": "int", "min": 1, "max": 50, "restart": False},
     "CONVERGE_MAX_MIN": {"label": "夜间收敛时间上限分钟（5-120）", "type": "int", "min": 5, "max": 120, "restart": False},
+    "FULLTEXT_MAX_MIN": {"label": "正文深读单轮限时分钟（10-120，夜窗内再钳制）", "type": "int", "min": 10, "max": 120, "restart": False},
     "BACKFILL_MONTHS": {"label": "期刊渐进回溯月数（0=关，1-24）", "type": "int", "min": 0, "max": 24, "restart": False},
     "BACKFILL_NIGHTLY": {"label": "每晚回溯几本期刊（1-10）", "type": "int", "min": 1, "max": 10, "restart": False},
 }
@@ -1189,6 +1191,10 @@ def _retro_knowledge_extract():
            progress={"done": 0, "total": len(rows)})
 
     for i, row in enumerate(rows):
+        from backend.jobs import past_night_deadline
+        if past_night_deadline():
+            logger.info(f"知识卡片抽取：夜窗截止，已处理 {i}/{len(rows)}，剩余明晚继续")
+            break
         paper = {
             "id": row["paper_id"], "title": row["title"], "summary": row["summary"],
             "AI": {"tldr": row["tldr"], "motivation": row["motivation"], "method": row["method"], "result": row["result"], "conclusion": row["conclusion"]},
@@ -1239,11 +1245,32 @@ def _retro_fulltext_analyze():
     logger = logging.getLogger("fulltext-analyze")
     logger.info(f"正文深度分析: {len(rows)} 篇待处理")
     from backend.jobs import _set_job_status as _fstat
+    from backend.jobs import past_night_deadline
+    from backend.db import get_runtime_settings
     _fstat("fulltext", "running", f"{len(rows)} 篇待深读",
            progress={"done": 0, "total": len(rows)})
 
+    # 深读是回溯型任务：单轮限时 FULLTEXT_MAX_MIN，且不得越过夜窗截止
+    # （10-13 事故：148 篇积压 × 2 分/篇超时 = 2 小时 0 成功，还把小任务全挤掉）
+    import time as _time
+    from backend.jobs import clamp_monotonic_to_night
+    max_min = max(10, min(120, int(get_runtime_settings().get("FULLTEXT_MAX_MIN", 45))))
+    stop_at = clamp_monotonic_to_night(_time.monotonic() + max_min * 60)
+
     analyzed = 0
+    stopped = None
     for i, row in enumerate(rows):
+        if past_night_deadline():
+            stopped = "夜窗截止"
+            break
+        if _time.monotonic() > stop_at:
+            stopped = f"单轮限时 {max_min} 分"
+            break
+        # 连续全败止损：前 8 篇 0 成功说明管线故障，烧完整个窗口也无人受益
+        if analyzed == 0 and i >= 8:
+            stopped = "连续失败止损（前8篇0成功，请检查 LLM 配置/超时）"
+            logger.error(f"[fulltext-analyze] {stopped}")
+            break
         paper = {
             "id": row["id"], "source": row["source"],
             "title": row["title"], "summary": row["summary"],
@@ -1264,8 +1291,8 @@ def _retro_fulltext_analyze():
             _fstat("fulltext", "running", f"{i + 1}/{len(rows)}（成功 {analyzed}）",
                    progress={"done": i + 1, "total": len(rows)})
 
-    logger.info(f"正文深度分析完成: {analyzed}/{len(rows)}")
-    _fstat("fulltext", "done", f"{analyzed}/{len(rows)} 篇深读完成")
+    logger.info(f"正文深度分析完成: {analyzed}/{len(rows)}" + (f"（{stopped}）" if stopped else ""))
+    _fstat("fulltext", "done", f"{analyzed}/{len(rows)} 篇深读完成" + (f"（{stopped}）" if stopped else ""))
 
 
 @app.route("/api/paper/<path:paper_id>/fulltext", methods=["GET"])

@@ -224,6 +224,15 @@ class BaseCrawlerJob(ABC):
                         if paper is None:
                             return
                         _track(paper)
+                        if past_night_deadline():
+                            # 夜窗截止：裸入库（零 LLM 消耗），明晚收敛按版本戳补全增强
+                            with lock:
+                                skipped["deadline"] = skipped.get("deadline", 0) + 1
+                            try:
+                                append_paper(paper, enhance=False)
+                            except Exception as e:
+                                logger.warning(f"[{self.name}] 截止后裸入库失败 {getattr(paper, 'id', '?')}: {e}")
+                            continue
                         try:
                             _process_one(paper)
                         except Exception as e:
@@ -254,8 +263,10 @@ class BaseCrawlerJob(ABC):
             else:
                 self._post_run(subs, fetched_info)
             fetched = fetched_box[0]  # join 后所有论文都已被取走，此即总数
-            total_rejected = fetched - written
+            total_rejected = fetched - written - skipped.get("deadline", 0)
             msg = f"{written} 接受, {total_rejected} 拒绝 (共 {fetched})"
+            if skipped.get("deadline"):
+                msg += f", {skipped['deadline']} 篇超夜窗裸入库(明晚收敛补全)"
             try:
                 from backend.crawler.openalex_client import quota_paused
                 if quota_paused():
@@ -774,6 +785,15 @@ def run_journal_backfill(months: int = 6, nightly: int = 0):
                 try:
                     if paper is None:
                         return
+                    if past_night_deadline():
+                        # 夜窗截止：裸入库，明晚收敛补全
+                        try:
+                            append_paper(paper, enhance=False)
+                            with lock:
+                                new_count[0] += 1
+                        except Exception as e:
+                            logger.warning(f"[backfill] 截止后裸入库失败: {e}")
+                        continue
                     result = append_paper(paper, enhance=True)
                     with lock:
                         done_count[0] += 1
@@ -1072,7 +1092,10 @@ def run_auto_convergence():
         st = get_runtime_settings()
         pct = max(1, min(50, int(st.get("CONVERGE_PCT", 10))))
         max_min = max(5, min(120, int(st.get("CONVERGE_MAX_MIN", 30))))
-        deadline = time.monotonic() + max_min * 60
+        deadline = clamp_monotonic_to_night(time.monotonic() + max_min * 60)
+        if past_night_deadline():
+            logger.info("[收敛] 夜窗已截止，本轮收敛跳过（明日继续）")
+            return
         stale = _stale_counts()
 
         if stale["card"]:
@@ -1151,6 +1174,38 @@ def run_digest_job():
 
 
 # ---------------------------------------------------------------------------
+# 夜窗硬截止（NIGHT_DEADLINE_MIN：起始后 N 分钟，到点停止一切自动 LLM 消耗）
+# 手动触发不受限——只约束夜间自动任务，避免挤占白天的个人配额窗口
+# ---------------------------------------------------------------------------
+
+def _night_deadline() -> float | None:
+    """当前夜窗的硬截止时刻（epoch 秒）；NIGHT_DEADLINE_MIN<=0 表示不限。"""
+    from backend.db import get_runtime_settings
+    s = get_runtime_settings()
+    mins = float(s.get("NIGHT_DEADLINE_MIN") or 0)
+    if mins <= 0:
+        return None
+    now = datetime.now()
+    start = now.replace(hour=int(s["NIGHT_START"]) % 24, minute=0, second=0, microsecond=0)
+    if start > now:
+        start -= timedelta(days=1)   # 夜窗跨午夜时归属昨晚开始的窗口
+    return (start + timedelta(minutes=mins)).timestamp()
+
+
+def past_night_deadline() -> bool:
+    d = _night_deadline()
+    return d is not None and time.time() >= d
+
+
+def clamp_monotonic_to_night(deadline: float) -> float:
+    """把 monotonic 截止时间收紧到夜窗截止之内（已过截止则立即到点）。"""
+    wall = _night_deadline()
+    if wall is None:
+        return deadline
+    return min(deadline, time.monotonic() + (wall - time.time()))
+
+
+# ---------------------------------------------------------------------------
 # Scheduler
 # ---------------------------------------------------------------------------
 
@@ -1195,6 +1250,7 @@ class Scheduler:
         else:
             for job_name in JOB_FUNCS:
                 self._schedule_next(job_name)
+        self._schedule_digest()
 
     def stop(self):
         self._running = False
@@ -1228,6 +1284,47 @@ class Scheduler:
         _scheduled_at[job_name] = target.strftime("%Y-%m-%d %H:%M")
         logger.info(f"[调度器] {job_name} 计划于 {target:%Y-%m-%d %H:%M} 自动运行（手动触发不受限，随时可跑）")
 
+    def _digest_run_at(self) -> datetime:
+        """日报生成时刻：所有任务槽位之后、夜窗截止前 10 分钟（收尾任务）。
+
+        日报若在 arxiv 链内生成，会早于 s2/crossref 等源入库——只包含
+        第一批论文；挪到夜窗收尾统一生成，才覆盖全部源。"""
+        from backend.db import get_runtime_settings
+        s = get_runtime_settings()
+        now = datetime.now()
+        base = now.replace(hour=int(s["NIGHT_START"]) % 24, minute=0, second=0, microsecond=0)
+        jobs_end = (len(JOB_FUNCS) - 1) * float(s["STAGGER_MINUTES"]) + 15
+        deadline_min = float(s.get("NIGHT_DEADLINE_MIN") or 0)
+        offset = jobs_end
+        if deadline_min > 10:
+            offset = max(jobs_end, deadline_min - 10)
+        target = base + timedelta(minutes=offset)
+        if target <= now:
+            target += timedelta(days=1)
+        return target
+
+    def _schedule_digest(self):
+        if not self._running:
+            return
+        target = self._digest_run_at()
+        delay = max(1.0, (target - datetime.now()).total_seconds())
+        t = threading.Timer(delay, self._run_digest_and_reschedule)
+        t.daemon = True
+        t.start()
+        self._timers.append(t)
+        _scheduled_at["digest"] = target.strftime("%Y-%m-%d %H:%M")
+        logger.info(f"[调度器] 日报计划于 {target:%Y-%m-%d %H:%M} 生成（夜窗收尾，覆盖全部源）")
+
+    def _run_digest_and_reschedule(self):
+        # 日报是收尾任务：不吃任务互斥（不爬取、不挤 OpenAlex），也不受夜窗截止跳过
+        if not self._running:
+            return
+        try:
+            run_digest_job()
+        except Exception as e:
+            logger.error(f"日报生成错误: {e}")
+        self._schedule_digest()
+
     def replan(self):
         """设置变更后重排时间表：取消现有定时器（运行中任务除外，其完成时自会重排）。"""
         if not self._running:
@@ -1239,6 +1336,7 @@ class Scheduler:
         for job_name in JOB_FUNCS:
             if job_name not in running:
                 self._schedule_next(job_name)
+        self._schedule_digest()
         logger.info(f"[调度器] 已按新设置重排时间表（{len(JOB_FUNCS) - len(running)} 个任务，运行中 {len(running)} 个不变）")
 
     def _run_and_schedule_next(self, job_name: str):
@@ -1250,6 +1348,11 @@ class Scheduler:
         OpenAlex 直接触发了日级限流。手动触发不受此限制。
         """
         if not self._running:
+            return
+        if past_night_deadline():
+            logger.info(f"[调度器] {job_name} 触发时已过夜窗截止，跳过本次自动运行")
+            _set_job_status(job_name, "skipped", "夜窗已截止，跳过自动运行")
+            self._schedule_next(job_name)
             return
         busy = [n for n, s in _job_status.items()
                 if n != job_name and s.get("status") == "running"]
@@ -1267,23 +1370,20 @@ class Scheduler:
             logger.error(f"夜间任务 {job_name} 执行错误: {e}")
 
         if job_name == "arxiv":
-            try:
-                run_retro_enhance()
-            except Exception as e:
-                logger.error(f"回溯增强执行错误: {e}")
-            try:
-                from backend.api import _retro_knowledge_extract
-                _retro_knowledge_extract()
-            except Exception as e:
-                logger.error(f"知识卡片抽取执行错误: {e}")
-            try:
-                from backend.api import _retro_fulltext_analyze
-                _retro_fulltext_analyze()
-            except Exception as e:
-                logger.error(f"正文分析执行错误: {e}")
-            try:
-                run_digest_job()
-            except Exception as e:
-                logger.error(f"摘要生成执行错误: {e}")
+            from backend.api import _retro_knowledge_extract, _retro_fulltext_analyze
+            # 注：日报不在此链生成——链走到这里时 s2/crossref 等源尚未入库，
+            # 只会包含第一批(arXiv)论文；日报由调度器在夜窗收尾时统一生成
+            for label, fn in [
+                ("回溯增强", run_retro_enhance),
+                ("知识卡片抽取", _retro_knowledge_extract),
+                ("正文分析", _retro_fulltext_analyze),
+            ]:
+                if past_night_deadline():
+                    logger.info(f"[调度器] 夜窗已截止，跳过{label}（次日补齐）")
+                    continue
+                try:
+                    fn()
+                except Exception as e:
+                    logger.error(f"{label}执行错误: {e}")
 
         self._schedule_next(job_name)

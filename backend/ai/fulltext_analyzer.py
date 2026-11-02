@@ -96,7 +96,8 @@ def _get_chain():
         model_name = task_model("fulltext")
         # 不用 with_structured_output：GLM 思考模式常返回嵌套 dict 值
         # （实测六字段全是对象，pydantic 严格校验丢弃整个高质量分析）——自行解析拍平
-        llm = build_chat(model_name, thinking=True)
+        # 深读输入长 + 思考输出长，默认 120s 必超时（10-13 全晚 148 篇 0 成功实锤）
+        llm = build_chat(model_name, thinking=True, timeout=300)
         _CHAIN = ChatPromptTemplate.from_template(_FULLTEXT_PROMPT) | llm
     return _CHAIN
 

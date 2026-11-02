@@ -36,7 +36,13 @@ Papers data:
 
 
 def generate_digest(date_str: str | None = None, language: str = "Chinese") -> str:
-    date_str = date_str or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # 日期标签用本地时区：日报是给人早上看的，凌晨 2 点生成标"昨天"(UTC)会造成错位。
+    # 窗口起点 = 该本地日期的零点换算成 UTC（created_at 全库统一 UTC）。
+    local_now = datetime.now().astimezone()
+    date_str = date_str or local_now.strftime("%Y-%m-%d")
+    local_midnight = datetime.strptime(date_str, "%Y-%m-%d").astimezone() \
+        if date_str != local_now.strftime("%Y-%m-%d") else local_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    window_start = local_midnight.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     from backend.db import get_conn, queue_write
 
     conn = get_conn()
@@ -49,7 +55,7 @@ def generate_digest(date_str: str | None = None, language: str = "Chinese") -> s
            WHERE p.created_at >= ? AND ai.recommendation != 'ignore'
            ORDER BY ai.relevance_score DESC, ai.quality_score DESC
            LIMIT 80""",
-        (f"{date_str} 00:00:00",),
+        (window_start,),
     ).fetchall()
 
     if not rows:
@@ -79,7 +85,9 @@ def generate_digest(date_str: str | None = None, language: str = "Chinese") -> s
         "papers_json": json.dumps(summaries, ensure_ascii=False, indent=2),
     })
 
-    digest_dir = Path(__file__).parent.parent / "digests"
+    # backend/ai/digest.py → 上三级才是仓库根（目录重构后原 parent.parent 指到 backend/
+    # 导致日报全写进 backend/digests/，API 读根目录 digests/ 永远走 DB 回退）
+    digest_dir = Path(__file__).resolve().parent.parent.parent / "digests"
     digest_dir.mkdir(exist_ok=True)
     digest_path = digest_dir / f"{date_str}.md"
     content = f"# Research Digest — {date_str}\n\n{result.content}\n"

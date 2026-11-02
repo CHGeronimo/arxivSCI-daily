@@ -420,8 +420,9 @@ def stop_writer() -> None:
 
 _SETTINGS_CACHE: dict = {"data": None, "checked": 0.0}
 _SETTING_DEFAULTS = {
-    "NIGHT_START": 2,          # 每日起始小时（0-23，默认 2=凌晨，可任意时段）
-    "STAGGER_MINUTES": 30,     # 夜间任务错峰间隔（分钟）
+    "NIGHT_START": 0,          # 每日起始小时（0-23，默认 0=午夜起跑，可任意时段）
+    "STAGGER_MINUTES": 15,     # 夜间任务错峰间隔（分钟；7 任务 × 15 分 = 最后 1:30 起）
+    "NIGHT_DEADLINE_MIN": 150, # 夜窗硬截止：起始后 N 分钟到点停 AI（150=02:30；0=不限）
     "RUN_ON_START": False,     # daemon 启动立即全量跑一轮（需重启生效）
     "DBLP_ROTATE_DAYS": 7,     # DBLP 会议轮换天数
     "S2_ROTATE_DAYS": 3,       # S2 关键词轮换天数
@@ -430,6 +431,7 @@ _SETTING_DEFAULTS = {
     "LLM_DAY_CONCURRENCY": 6, "LLM_NIGHT_CONCURRENCY": 9,  # 两档并发（白天实测安全6）
     "CONVERGE_PCT": 10,       # 夜间收敛：每轮处理旧版量的百分比
     "CONVERGE_MAX_MIN": 30,   # 夜间收敛：单轮时间上限（分钟）
+    "FULLTEXT_MAX_MIN": 45,   # 正文深读单轮限时（分钟，含夜窗截止钳制+连续全败止损）
     "BACKFILL_MONTHS": 0,     # 期刊渐进回溯目标月数（0=不启用，1-24）
     "BACKFILL_NIGHTLY": 5,    # 每晚回溯几本期刊（1-10）
 }
