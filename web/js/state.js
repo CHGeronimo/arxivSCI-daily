@@ -133,7 +133,13 @@ export function saveUIState() {
 export function restoreUIState() {
     try {
         const st = JSON.parse(localStorage.getItem('uiState') || 'null');
-        if (!st) return false;
+        if (!st) {
+            // 默认视图（2026-11-02 对齐）：只显示 recommended 及以上；
+            // reference 金字塔底座保留在库中，勾选侧栏"Reference"即可查看。
+            // 用户一旦手动改过筛选，之后以保存的 uiState 为准。
+            activeFilters.type = new Set(['must-read', 'recommended']);
+            return false;
+        }
         for (const [k, arr] of Object.entries(st.filters || {})) {
             if (activeFilters[k]) activeFilters[k] = new Set(arr);
         }

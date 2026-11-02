@@ -50,6 +50,24 @@ DEFAULT_AI = {
 }
 
 
+def tier_from_scores(rel: int, qua: int) -> str:
+    """推荐档位的确定性裁决（LLM 只打分，档位由本函数统一裁定）。
+
+    2026-11-02 二次校准（用户：默认视图压到 ~15 篇/天，低分要敢打）：
+    - must-read: rel≥9（特长生）或 rel≥8 且 qua≥8（全面发展，双 8 门槛）
+    - recommended: rel≥7 且 qua≥7（全面型）或 rel≥6 且 qua≥9（质量特长生）
+    - reference: rel≥6（金字塔底座，默认视图不显示，筛选项可见）
+    - ignore: rel≤5
+    """
+    if rel >= 9 or (rel >= 8 and qua >= 8):
+        return "must-read"
+    if (rel >= 7 and qua >= 7) or (rel >= 6 and qua >= 9):
+        return "recommended"
+    if rel >= 6:
+        return "reference"
+    return "ignore"
+
+
 def load_research_profile() -> dict:
     profile_path = os.path.join(os.path.dirname(__file__), '..', '..', 'research_profile.json')
     if os.path.exists(profile_path):
@@ -192,13 +210,19 @@ def enhance_single(paper: dict, chain, profile: dict, language: str) -> dict:
         paper["AI"]["recommendation"] = "reference"
         rec = "reference"
 
-    # Auto-downgrade low-relevance reference to ignore
-    if rec == "reference":
-        rel = paper["AI"].get("relevance_score", 0) or 0
-        if rel <= 5:
-            logger.info(f"低相关性 reference 降级 (rel={rel}) 论文 {paper.get('id', '?')}")
-            paper["AI"]["recommendation"] = "ignore"
+    # 分层校正（2026-11-02 与用户对齐 20:8:1 金字塔）：代码确定性裁决，
+    # LLM 只负责打分——档位不漂移，比例可控。特长生/全面发展双通道。
+    rel = paper["AI"].get("relevance_score", 0) or 0
+    qua = paper["AI"].get("quality_score", 0) or 0
+    tier = tier_from_scores(rel, qua)
+    if tier != rec:
+        logger.info(f"分层校正 {rec}→{tier} (rel={rel},qua={qua}) 论文 {paper.get('id', '?')}")
+        paper["AI"]["recommendation"] = tier
+    if tier == "ignore":
+        if not paper["AI"].get("skip_reason"):
             paper["AI"]["skip_reason"] = "low_relevance"
+    else:
+        paper["AI"]["skip_reason"] = ""
 
     # Ensure every key from DEFAULT_AI exists
     for k, v in DEFAULT_AI.items():

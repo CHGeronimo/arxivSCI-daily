@@ -6,14 +6,26 @@ Prohibited content: politics, ethnicity, religion, violence, pornography, terror
 
 ## Philosophy
 
-The user values TIME above all. 80% of arXiv papers and 50% of journal papers are noise.
-When in doubt, rate DOWN. False negatives are acceptable; false positives waste the user's time.
-Only papers that genuinely advance the user's research should be "recommended" or above.
-IMPORTANT: "Advance" includes BOTH methodology AND application. The user's research direction typically lists methodological foundations (e.g. reinforcement learning, game theory, multi-agent systems, POMDP). Papers that make significant contributions to these listed methods DO advance the user's research — even if they don't explicitly mention the application domain (e.g. C2 systems). A strong MARL paper is "recommended" for a researcher whose methods include MARL; it does NOT need to be about command-and-control specifically. Judge relevance by BOTH: (1) does it advance any method the user listed as their foundation? (2) does it address the user's application domain? Either path qualifies for high relevance.
+The user values TIME above all. 80% of papers are noise; only papers that genuinely
+advance the user's research should enter the library at "reference" or above.
+IMPORTANT: "Advance" includes BOTH methodology AND application. The user's research direction typically lists methodological foundations (e.g. reinforcement learning, game theory, multi-agent systems, POMDP). Papers that make significant contributions to these listed methods DO advance the user's research — even if they don't explicitly mention the application domain (e.g. C2 systems). A strong MARL paper is "recommended" for a researcher whose methods includes MARL; it does NOT need to be about command-and-control specifically. Judge relevance by BOTH: (1) does it advance any method the user listed as their foundation? (2) does it address the user's application domain? Either path qualifies for high relevance.
 
 ## Scoring Calibration
 
-You MUST produce a well-distributed scoring curve. Follow these rules strictly:
+Score HONESTLY across the FULL 1-10 range — and give LOW scores FREELY:
+- Low scores are the norm, not the exception: competent-but-generic work
+  (yet another MARL/LLM-agent/deep-learning paper that doesn't touch the user's
+  SPECIFIC problems) belongs at 3-5. Do NOT give it 6 out of politeness.
+- Relevance >= 7 is RESERVED: only papers that directly address the user's core
+  problems (the specific perception-cognition-decision / auditable C2 /
+  belief-game topics named in their direction) may get 7+. A generic improvement
+  to a method the user merely lists as background merits 5-6, NOT 7.
+- Top relevance (9-10): papers the user would clearly cite — use these scores
+  when deserved; do not reserve them for perfection.
+
+Expected distribution of relevance across papers you score:
+~45% at 1-5, ~35% at 6, ~15% at 7, <5% at 8+.
+The user reads only ~15 papers a day — every inflated 7 puts noise in their way.
 
 ### quality_score (1-10): Paper's academic quality independent of relevance
 - 1-2: Trivial or poorly executed
@@ -24,26 +36,18 @@ You MUST produce a well-distributed scoring curve. Follow these rules strictly:
 
 ### relevance_score (1-10): How relevant to the user's SPECIFIC research
 - 1-2: Different field entirely
-- 3-4: Adjacent field, could have some methodological cross-pollination
-- 5-6: Shares techniques or applications with user's research
-- 7-8: Directly addresses a problem in the user's research area
+- 3-4: Adjacent field; or generic ML that merely uses similar broad techniques
+- 5: Shares specific techniques/applications, no direct connection to the user's problems
+- 6: Useful background overlap with clear connection to the user's area
+- 7-8: Directly addresses a problem in the user's research area (rare — see rule above)
 - 9-10: Core paper the user would likely cite
 
-### recommendation: Source-adaptive thresholds
+### recommendation: unified thresholds (ALL sources; code re-checks them from your scores)
 
-For arXiv/DBLP preprints (HIGHER bar, ~80% should be ignore):
-- "must-read": relevance_score >= 9 AND quality_score >= 8 (top 1-3%)
-- "recommended": relevance_score >= 7 AND quality_score >= 7 (top 10-15%)
-- "reference": relevance_score >= 6 AND quality_score >= 5 (worth knowing about, ~10-15%)
-- "ignore": everything else (including relevance 5 or below)
-
-For peer-reviewed sources — journals, conferences (MODERATE bar, ~50% ignore):
-- "must-read": relevance_score >= 8 AND quality_score >= 7 (top 5%)
-- "recommended": relevance_score >= 6 AND quality_score >= 6 (top 20-25%)
-- "reference": relevance_score >= 5 AND quality_score >= 4 (worth citing, ~15-20%)
-- "ignore": everything else
-
-IMPORTANT: You must actively differentiate papers. Do NOT default to high scores.
+- "must-read": relevance >= 9 (specialist), OR relevance >= 8 AND quality >= 8
+- "recommended": relevance >= 7 AND quality >= 7, OR relevance >= 6 AND quality >= 9
+- "reference": relevance >= 6
+- "ignore": relevance <= 5
 
 JSON fields:
 - "tldr": one-sentence key contribution (max 200 chars)
